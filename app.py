@@ -1,7 +1,6 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import sklearn
 from sklearn.ensemble import RandomForestClassifier
 import shap
 import matplotlib.pyplot as plt
@@ -10,28 +9,58 @@ import matplotlib.pyplot as plt
 st.set_page_config(page_title="داشبورد هوشمند تشخیص بیماری قلبی (XAI)", layout="wide")
 
 st.title("🫀 سامانه هوش مصنوعی و توضیح‌پذیر (XAI) تشخیص بیماری قلبی")
-st.markdown("این داشبورد به پزشکان کمک می‌کند علاوه بر پیش‌بینی ریسک بیماری قلبی، **دلایل پزشکی** پشت تصمیم هوش مصنوعی را مشاهده کنند.")
+st.markdown("این داشبورد با استفاده از دیتاست واقعی بالینی، بیماری قلبی را پیش‌بینی کرده و **دلایل پزشکی (XAI)** را به پزشک نشان می‌دهد.")
+
+# بارگذاری دیتاست واقعی از گیت‌هاب
+@st.cache_data
+def load_data():
+    # لینک مستقیم به فایل heart.csv در گیت‌هاب شما
+    url = "https://raw.githubusercontent.com/arezu-mashkany/heart-disease-xai/main/heart.csv"
+    
+    # ستون‌های دیتاست کلیولند (UCI)
+    col_names = ['age', 'sex', 'cp', 'trestbps', 'chol', 'fbs', 'restecg', 'thalach', 'exang', 'oldpeak', 'slope', 'ca', 'thal', 'num']
+    
+    df = pd.read_csv(url, names=col_names, na_values="?")
+    df = df.dropna() # حذف ردیف‌های دارای داده گمشده
+    
+    # تبدیل ستون هدف (num) به باینری: 0 مخفف سالم، 1 و بالاتر مخفف بیمار
+    df['target'] = np.where(df['num'] > 0, 1, 0)
+    df = df.drop(columns=['num'])
+    return df
+
+try:
+    df = load_data()
+except Exception as e:
+    st.error(f"خطا در بارگذاری دیتاست: {e}")
+    st.stop()
 
 # بخش اول: دریافت اطلاعات بیمار از طریق سایدبار
 st.sidebar.header("مشخصات بالینی بیمار")
 
 def user_input_features():
-    age = st.sidebar.slider("سن", 29, 77, 54)
+    age = st.sidebar.slider("سن", int(df['age'].min()), int(df['age'].max()), int(df['age'].mean()))
     sex = st.sidebar.selectbox("جنسیت (1: مرد، 0: زن)", (1, 0))
     cp = st.sidebar.selectbox("نوع درد قفسه سینه (0 تا 3)", (0, 1, 2, 3))
-    trestbps = st.sidebar.slider("فشار خون در حالت استراحت", 90, 200, 130)
-    chol = st.sidebar.slider("کلسترول خون", 120, 564, 246)
-    thalach = st.sidebar.slider("حداکثر ضربان قلب", 71, 202, 150)
-    oldpeak = st.sidebar.slider("افسردگی ST (Oldpeak)", 0.0, 6.2, 1.0)
+    trestbps = st.sidebar.slider("فشار خون در حالت استراحت", int(df['trestbps'].min()), int(df['trestbps'].max()), int(df['trestbps'].mean()))
+    chol = st.sidebar.slider("کلسترول خون", int(df['chol'].min()), int(df['chol'].max()), int(df['chol'].mean()))
+    thalach = st.sidebar.slider("حداکثر ضربان قلب", int(df['thalach'].min()), int(df['thalach'].max()), int(df['thalach'].mean()))
+    oldpeak = st.sidebar.slider("افسردگی ST (Oldpeak)", float(df['oldpeak'].min()), float(df['oldpeak'].max()), float(df['oldpeak'].mean()))
     
+    # مقادیر پیش‌فرض برای سایر ستون‌ها که در سایدبار ساده نکردیم
     data = {
         'age': age,
         'sex': sex,
         'cp': cp,
         'trestbps': trestbps,
         'chol': chol,
+        'fbs': 0,
+        'restecg': 1,
         'thalach': thalach,
-        'oldpeak': oldpeak
+        'exang': 0,
+        'oldpeak': oldpeak,
+        'slope': 1,
+        'ca': 0.0,
+        'thal': 2.0
     }
     features = pd.DataFrame(data, index=[0])
     return features
@@ -42,19 +71,17 @@ df_input = user_input_features()
 st.subheader("📋 اطلاعات ورودی بیمار:")
 st.write(df_input)
 
-# شبیه‌سازی آموزش مدل
+# آموزش مدل روی داده‌های واقعی
 @st.cache_resource
-def load_model_and_data():
-    from sklearn.datasets import make_classification
-    X, y = make_classification(n_samples=300, n_features=7, n_informative=5, random_state=42)
-    feature_names = ['age', 'sex', 'cp', 'trestbps', 'chol', 'thalach', 'oldpeak']
-    X_df = pd.DataFrame(X, columns=feature_names)
+def train_model(data):
+    X = data.drop(columns=['target'])
+    y = data['target']
     
     model = RandomForestClassifier(random_state=42)
-    model.fit(X_df, y)
-    return model, X_df
+    model.fit(X, y)
+    return model, X
 
-model, X_train = load_model_and_data()
+model, X_train = train_model(df)
 
 # دکمه پیش‌بینی
 if st.button("🔍 تحلیل و پیش‌بینی هوش مصنوعی"):
