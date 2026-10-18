@@ -7,9 +7,23 @@ import matplotlib.pyplot as plt
 
 # تنظیمات صفحه وب
 st.set_page_config(page_title="داشبورد هوشمند تشخیص بیماری قلبی (XAI)", layout="wide")
-# نمایش تعداد داده‌های بارگذاری شده
-st.info(f"📊 تعداد کل نمونه‌های بالینی بارگذاری شده در سیستم: {df.shape[0]} بیمار (با {df.shape[1]} ویژگی پزشکی)")
 
+# استایل CSS برای راست‌چین کردن متن‌ها و فونت فارسی
+st.markdown("""
+    <style>
+    @import url('https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;700&display=swap');
+    
+    html, body, [class*="css"]  {
+        font-family: 'Vazirmatn', sans-serif;
+        direction: rtl;
+        text-align: right;
+    }
+    .stSidebar {
+        direction: rtl;
+        text-align: right;
+    }
+    </style>
+    """, unsafe_allow_html=True)
 
 st.title("🫀 سامانه هوش مصنوعی و توضیح‌پذیر (XAI) تشخیص بیماری قلبی")
 st.markdown("این داشبورد با استفاده از دیتاست واقعی بالینی، بیماری قلبی را پیش‌بینی کرده و **دلایل پزشکی (XAI)** را به پزشک نشان می‌دهد.")
@@ -17,16 +31,13 @@ st.markdown("این داشبورد با استفاده از دیتاست واق�
 # بارگذاری دیتاست واقعی از گیت‌هاب
 @st.cache_data
 def load_data():
-    # لینک مستقیم به فایل heart.csv در گیت‌هاب شما
     url = "https://raw.githubusercontent.com/arezu-mashkany/heart-disease-xai/main/heart.csv"
     
-    # ستون‌های دیتاست کلیولند (UCI)
     col_names = ['age', 'sex', 'cp', 'trestbps', 'chol', 'fbs', 'restecg', 'thalach', 'exang', 'oldpeak', 'slope', 'ca', 'thal', 'num']
     
     df = pd.read_csv(url, names=col_names, na_values="?")
     df = df.dropna() # حذف ردیف‌های دارای داده گمشده
     
-    # تبدیل ستون هدف (num) به باینری: 0 مخفف سالم، 1 و بالاتر مخفف بیمار
     df['target'] = np.where(df['num'] > 0, 1, 0)
     df = df.drop(columns=['num'])
     return df
@@ -36,6 +47,9 @@ try:
 except Exception as e:
     st.error(f"خطا در بارگذاری دیتاست: {e}")
     st.stop()
+
+# نمایش تعداد داده‌های بارگذاری شده (الان اینجا درست کار می‌کند چون df بارگذاری شده)
+st.info(f"📊 تعداد کل نمونه‌های بالینی بارگذاری شده در سیستم: {df.shape[0]} بیمار (با {df.shape[1]} ویژگی پزشکی)")
 
 # بخش اول: دریافت اطلاعات بیمار از طریق سایدبار
 st.sidebar.header("مشخصات بالینی بیمار")
@@ -49,7 +63,6 @@ def user_input_features():
     thalach = st.sidebar.slider("حداکثر ضربان قلب", int(df['thalach'].min()), int(df['thalach'].max()), int(df['thalach'].mean()))
     oldpeak = st.sidebar.slider("افسردگی ST (Oldpeak)", float(df['oldpeak'].min()), float(df['oldpeak'].max()), float(df['oldpeak'].mean()))
     
-    # مقادیر پیش‌فرض برای سایر ستون‌ها که در سایدبار ساده نکردیم
     data = {
         'age': age,
         'sex': sex,
