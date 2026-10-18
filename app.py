@@ -70,12 +70,11 @@ with tab_input:
         diabetes = st.selectbox("دیابت", (0, 1), format_func=lambda x: "بله" if x == 1 else "خیر")
     with col2:
         totChol = st.slider("کلسترول کل (mg/dL)", 100, 600, int(df['totChol'].mean()))
-       sysBP = st.slider("فشار خون سیستولیک", float(df['sysBP'].min()), float(df['sysBP'].max()), float(df['sysBP'].mean()))
-diaBP = st.slider("فشار خون دیاستولیک", float(df['diaBP'].min()), float(df['diaBP'].max()), float(df['diaBP'].mean()))
-BMI = st.slider("شاخص توده بدنی (BMI)", float(df['BMI'].min()), float(df['BMI'].max()), float(df['BMI'].mean()))
-
+        sysBP = st.slider("فشار خون سیستولیک", float(df['sysBP'].min()), float(df['sysBP'].max()), float(df['sysBP'].mean()))
+        diaBP = st.slider("فشار خون دیاستولیک", float(df['diaBP'].min()), float(df['diaBP'].max()), float(df['diaBP'].mean()))
+        glucose = st.slider("قند خون", 40, 400, int(df['glucose'].mean()))
     with col3:
-        BMI = st.slider("شاخص توده بدنی (BMI)", 15.0, 60.0, float(df['BMI'].mean()))
+        BMI = st.slider("شاخص توده بدنی (BMI)", float(df['BMI'].min()), float(df['BMI'].max()), float(df['BMI'].mean()))
         heartRate = st.slider("ضربان قلب", 40, 200, int(df['heartRate'].mean()))
         BPMeds = st.selectbox("مصرف داروی فشار خون", (0, 1), format_func=lambda x: "بله" if x == 1 else "خیر")
         prevalentHyp = st.selectbox("سابقه فشار خون بالا", (0, 1), format_func=lambda x: "بله" if x == 1 else "خیر")
