@@ -8,140 +8,113 @@ import matplotlib.pyplot as plt
 # تنظیمات صفحه
 st.set_page_config(page_title="تشخیص بیماری قلبی با XAI", layout="wide")
 
-# استایل ظاهری (فونت فارسی + راست‌چین کردن متن‌ها)
+# استایل ظاهری
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;700&display=swap');
-
-    html, body, [class*="css"] {
-        font-family: 'Vazirmatn', sans-serif;
-    }
-
-    h1, h2, h3, p, li {
-        text-align: right;
-    }
+    html, body, [class*="css"] { font-family: 'Vazirmatn', sans-serif; }
+    h1, h2, h3, p, li { text-align: right; }
     </style>
     """, unsafe_allow_html=True)
 
 st.title("🫀 سامانه هوش مصنوعی و توضیح‌پذیر (XAI) تشخیص بیماری قلبی")
-st.markdown("این داشبورد با استفاده از دیتاست واقعی بالینی، بیماری قلبی را پیش‌بینی کرده و **دلایل پزشکی (XAI)** را به پزشک نشان می‌دهد.")
 
-# بارگذاری دیتاست واقعی از گیت‌هاب با پاکسازی پیشرفته
 @st.cache_data
 def load_data():
+    # آدرس مستقیم فایل خام در گیت‌هاب
     url = "https://raw.githubusercontent.com/arezu-mashkany/heart-disease-xai/main/heart.csv"
-
-    col_names = ['age', 'sex', 'cp', 'trestbps', 'chol', 'fbs', 'restecg', 'thalach', 'exang', 'oldpeak', 'slope', 'ca', 'thal', 'num']
-
-    # خواندن فایل (header=None یعنی فایل سطر عنوان ندارد و داده‌های خام است)
-    df = pd.read_csv(url, names=col_names, header=None, na_values="?")
     
-    # تبدیل همه ستون‌ها به عدد (اگر مقداری متنی یا هدر بود به NaN تبدیل شود)
-    for col in df.columns:
-        df[col] = pd.to_numeric(df[col], errors='coerce')
-
-    df = df.dropna()  # حذف ردیف‌های دارای داده گمشده یا نامعتبر
-
-    df['target'] = np.where(df['num'] > 0, 1, 0)
-    df = df.drop(columns=['num'])
+    # چون فایل شما هدر دارد، header=0 قرار می‌دهیم
+    df = pd.read_csv(url, header=0)
+    
+    # تبدیل ستون‌های متنی به عددی برای اینکه مدل کار کند (Encoding)
+    # Sex: M=1, F=0
+    df['Sex'] = df['Sex'].map({'M': 1, 'F': 0})
+    # ChestPainType: تبدیل به عدد
+    df['ChestPainType'] = df['ChestPainType'].astype('category').cat.codes
+    # RestingECG: تبدیل به عدد
+    df['RestingECG'] = df['RestingECG'].astype('category').cat.codes
+    # ExerciseAngina: N=0, Y=1
+    df['ExerciseAngina'] = df['ExerciseAngina'].map({'N': 0, 'Y': 1})
+    # ST_Slope: تبدیل به عدد
+    df['ST_Slope'] = df['ST_Slope'].astype('category').cat.codes
+    
+    # ستون هدف (HeartDisease) را به 0 و 1 استاندارد تبدیل می‌کنیم اگر لازم باشد
+    # در اینجا فرض بر این است که HeartDisease یا 0 است یا 1
+    
     return df
 
-# بارگذاری دیتا
 try:
     df = load_data()
+    st.info(f"📊 تعداد نمونه‌های بارگذاری‌شده: {len(df)} بیمار")
 except Exception as e:
-    st.error(f"خطا در بارگذاری دیتاست: {e}")
+    st.error(f"خطا در بارگذاری: {e}")
     st.stop()
 
-# بررسی اینکه دیتا خالی نباشد
-if df.empty:
-    st.error("دیتاست خالی است یا فایل `heart.csv` در گیت‌هاب ساختار درستی ندارد.")
-    st.stop()
-
-# نمایش تعداد داده‌ها
-st.info(
-    f"📊 تعداد نمونه‌های بارگذاری‌شده: {len(df)} بیمار | "
-    f"تعداد ویژگی‌های پزشکی: {df.shape[1] - 1}"
-)
-
-# بخش دوم: فرم ورود اطلاعات بیمار
+# بخش ورودی کاربر
 st.sidebar.header("مشخصات بالینی بیمار")
 
 def user_input_features():
-    age = st.sidebar.slider("سن", int(df['age'].min()), int(df['age'].max()), int(df['age'].mean()))
-    sex = st.sidebar.selectbox("جنسیت (1: مرد، 0: زن)", (1, 0))
-    cp = st.sidebar.selectbox("نوع درد قفسه سینه (0 تا 3)", (0, 1, 2, 3))
-    trestbps = st.sidebar.slider("فشار خون در حالت استراحت", int(df['trestbps'].min()), int(df['trestbps'].max()), int(df['trestbps'].mean()))
-    chol = st.sidebar.slider("کلسترول خون", int(df['chol'].min()), int(df['chol'].max()), int(df['chol'].mean()))
-    thalach = st.sidebar.slider("حداکثر ضربان قلب", int(df['thalach'].min()), int(df['thalach'].max()), int(df['thalach'].mean()))
-    oldpeak = st.sidebar.slider("افسردگی ST (Oldpeak)", float(df['oldpeak'].min()), float(df['oldpeak'].max()), float(df['oldpeak'].mean()))
+    # بر اساس ستون‌های فایل شما
+    age = st.sidebar.slider("Age (سن)", int(df['Age'].min()), int(df['Age'].max()), int(df['Age'].mean()))
+    sex = st.sidebar.selectbox("Sex (جنسیت: 1:M, 0:F)", (1, 0))
+    cp = st.sidebar.selectbox("ChestPainType (کد نوع درد)", sorted(df['ChestPainType'].unique()))
+    trestbps = st.sidebar.slider("RestingBP (فشار خون)", int(df['RestingBP'].min()), int(df['RestingBP'].max()), int(df['RestingBP'].mean()))
+    chol = st.sidebar.slider("Cholesterol (کلسترول)", int(df['Cholesterol'].min()), int(df['Cholesterol'].max()), int(df['Cholesterol'].mean()))
+    fbs = st.sidebar.selectbox("FastingBS (قند خون)", (0, 1))
+    recg = st.sidebar.selectbox("RestingECG (کد ECG)", sorted(df['RestingECG'].unique()))
+    maxhr = st.sidebar.slider("MaxHR (بیشینه ضربان)", int(df['MaxHR'].min()), int(df['MaxHR'].max()), int(df['MaxHR'].mean()))
+    exang = st.sidebar.selectbox("ExerciseAngina (0:No, 1:Yes)", (0, 1))
+    oldpeak = st.sidebar.slider("Oldpeak", float(df['Oldpeak'].min()), float(df['Oldpeak'].max()), float(df['Oldpeak'].mean()))
+    slope = st.sidebar.selectbox("ST_Slope (کد شیب)", sorted(df['ST_Slope'].unique()))
 
     data = {
-        'age': age,
-        'sex': sex,
-        'cp': cp,
-        'trestbps': trestbps,
-        'chol': chol,
-        'fbs': 0,
-        'restecg': 1,
-        'thalach': thalach,
-        'exang': 0,
-        'oldpeak': oldpeak,
-        'slope': 1,
-        'ca': 0.0,
-        'thal': 2.0
+        'Age': age, 'Sex': sex, 'ChestPainType': cp, 'RestingBP': trestbps,
+        'Cholesterol': chol, 'FastingBS': fbs, 'RestingECG': recg,
+        'MaxHR': maxhr, 'ExerciseAngina': exang, 'Oldpeak': oldpeak,
+        'ST_Slope': slope
     }
-    features = pd.DataFrame(data, index=[0])
-    return features
+    return pd.DataFrame(data, index=[0])
 
 df_input = user_input_features()
 
-# نمایش مقادیر وارد شده
 st.subheader("📋 اطلاعات ورودی بیمار:")
 st.write(df_input)
 
-# آموزش مدل روی داده‌های واقعی
+# آموزش مدل
 @st.cache_resource
 def train_model(data):
-    X = data.drop(columns=['target'])
-    y = data['target']
-
+    # جدا کردن ویژگی‌ها و هدف بر اساس نام ستون‌های جدید شما
+    X = data.drop(columns=['HeartDisease'])
+    y = data['HeartDisease']
     model = RandomForestClassifier(random_state=42)
     model.fit(X, y)
     return model
 
 model = train_model(df)
 
-# دکمه پیش‌بینی
-if st.button("🔍 تحلیل و پیش‌بینی هوش مصنوعی"):
+if st.button("🔍 تحلیل و پیش‌بینی"):
     prediction = model.predict(df_input)
-    prediction_proba = model.predict_proba(df_input)
+    prob = model.predict_proba(df_input)
 
-    st.subheader("📌 نتیجه ارزیابی:")
     if prediction[0] == 1:
-        st.error(f"⚠️ ریسک بالا: احتمال ابتلای به بیماری قلبی وجود دارد. (اطمینان مدل: {prediction_proba[0][1]*100:.1f}%)")
+        st.error(f"⚠️ ریسک بالا: احتمال ابتلای به بیماری قلبی وجود دارد. (اطمینان: {prob[0][1]*100:.1f}%)")
     else:
-        st.success(f"✅ ریسک پایین: احتمال ابتلای کمتری وجود دارد. (اطمینان مدل: {prediction_proba[0][0]*100:.1f}%)")
+        st.success(f"✅ ریسک پایین: احتمال ابتلای کم است. (اطمینان: {prob[0][0]*100:.1f}%)")
 
-    # بخش XAI (توضیح‌پذیری با SHAP)
+    # XAI Section
     st.markdown("---")
-    st.subheader("🧠 بخش توضیح‌پذیری پزشک (XAI - تحلیل عوامل مؤثر)")
-    st.markdown("نمودار زیر نشان می‌دهد کدام فاکتورهای بالینی این بیمار بیشترین تأثیر را در تصمیم‌گیری هوش مصنوعی داشته‌اند:")
-
-    try:
-        explainer = shap.TreeExplainer(model)
-        shap_values = explainer.shap_values(df_input)
-
-        if isinstance(shap_values, list):
-            fig = plt.figure(figsize=(8, 4))
-            shap.summary_plot(shap_values[1], df_input, plot_type="bar", show=False)
-            st.pyplot(fig)
-        else:
-            sv = shap_values[:, :, 1]
-            fig = plt.figure(figsize=(8, 4))
-            shap.summary_plot(sv, df_input, plot_type="bar", show=False)
-            st.pyplot(fig)
-    except Exception as e:
-        st.info("نمودار تحلیلی برای این نمونه آماده نشد، اما نتیجه پیش‌بینی بالا معتبر است.")
-
-st.caption("ساخته‌شده برای پروژه کارشناسی: تشخیص بیماری قلبی با هوش مصنوعی توضیح‌پذیر (XAI)")
+    st.subheader("🧠 تحلیل عوامل مؤثر (XAI)")
+    
+    explainer = shap.TreeExplainer(model)
+    # برای مدل RandomForest در SHAP، استفاده از shap_values[1] برای کلاس مثبت است
+    shap_values = explainer.shap_values(df_input)
+    
+    fig, ax = plt.subplots()
+    # اگر shap_values لیست باشد (برای مدل‌های چند کلاسی یا قدیمی)
+    if isinstance(shap_values, list):
+        shap.summary_plot(shap_values[1], df_input, plot_type="bar", show=False)
+    else:
+        shap.summary_plot(shap_values, df_input, plot_type="bar", show=False)
+    
+    st.pyplot(plt.gcf())
