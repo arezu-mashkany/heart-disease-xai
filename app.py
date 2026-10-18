@@ -26,28 +26,39 @@ st.markdown("""
 st.title("🫀 سامانه هوش مصنوعی و توضیح‌پذیر (XAI) تشخیص بیماری قلبی")
 st.markdown("این داشبورد با استفاده از دیتاست واقعی بالینی، بیماری قلبی را پیش‌بینی کرده و **دلایل پزشکی (XAI)** را به پزشک نشان می‌دهد.")
 
-# بارگذاری دیتاست واقعی از گیت‌هاب
+# بارگذاری دیتاست واقعی از گیت‌هاب با پاکسازی پیشرفته
 @st.cache_data
 def load_data():
     url = "https://raw.githubusercontent.com/arezu-mashkany/heart-disease-xai/main/heart.csv"
 
     col_names = ['age', 'sex', 'cp', 'trestbps', 'chol', 'fbs', 'restecg', 'thalach', 'exang', 'oldpeak', 'slope', 'ca', 'thal', 'num']
 
-    df = pd.read_csv(url, names=col_names, na_values="?")
-    df = df.dropna()  # حذف ردیف‌های دارای داده گمشده
+    # خواندن فایل (header=None یعنی فایل سطر عنوان ندارد و داده‌های خام است)
+    df = pd.read_csv(url, names=col_names, header=None, na_values="?")
+    
+    # تبدیل همه ستون‌ها به عدد (اگر مقداری متنی یا هدر بود به NaN تبدیل شود)
+    for col in df.columns:
+        df[col] = pd.to_numeric(df[col], errors='coerce')
+
+    df = df.dropna()  # حذف ردیف‌های دارای داده گمشده یا نامعتبر
 
     df['target'] = np.where(df['num'] > 0, 1, 0)
     df = df.drop(columns=['num'])
     return df
 
-# بخش اول: بارگذاری دیتا (قبل از هر جای دیگر استفاده از df)
+# بارگذاری دیتا
 try:
     df = load_data()
 except Exception as e:
     st.error(f"خطا در بارگذاری دیتاست: {e}")
     st.stop()
 
-# نمایش تعداد داده‌ها (این خط باید بعد از ساخته شدن df باشد)
+# بررسی اینکه دیتا خالی نباشد
+if df.empty:
+    st.error("دیتاست خالی است یا فایل `heart.csv` در گیت‌هاب ساختار درستی ندارد.")
+    st.stop()
+
+# نمایش تعداد داده‌ها
 st.info(
     f"📊 تعداد نمونه‌های بارگذاری‌شده: {len(df)} بیمار | "
     f"تعداد ویژگی‌های پزشکی: {df.shape[1] - 1}"
@@ -126,7 +137,6 @@ if st.button("🔍 تحلیل و پیش‌بینی هوش مصنوعی"):
             shap.summary_plot(shap_values[1], df_input, plot_type="bar", show=False)
             st.pyplot(fig)
         else:
-            # نسخه‌های جدید SHAP یک آرایه سه‌بعدی برمی‌گردانند
             sv = shap_values[:, :, 1]
             fig = plt.figure(figsize=(8, 4))
             shap.summary_plot(sv, df_input, plot_type="bar", show=False)
