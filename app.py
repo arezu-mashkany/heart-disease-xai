@@ -7,20 +7,44 @@ import matplotlib.pyplot as plt
 
 st.set_page_config(page_title="سامانه هوشمند تشخیص بیماری قلبی", page_icon="🫀", layout="wide")
 
-# ---------- استایل ----------
+# ---------- استایل و راست‌چین کردن کامل (RTL) ----------
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;700&display=swap');
-    html, body, [class*="css"] { font-family: 'Vazirmatn', sans-serif; }
-    h1, h2, h3, p, li { text-align: right; }
+    
+    html, body, [class*="css"] {
+        font-family: 'Vazirmatn', sans-serif;
+        direction: rtl;
+        text-align: right;
+    }
+    
+    /* راست‌چین کردن عنوان‌ها و متن‌ها */
+    h1, h2, h3, h4, h5, h6, p, label, span, div {
+        direction: rtl;
+        text-align: right;
+    }
+    
+    /* استایل دکمه تحلیل */
     div.stButton > button {
         width: 100%; height: 3em; font-size: 1.1em; font-weight: bold;
         background: linear-gradient(90deg, #e63946, #d62828);
         color: white; border: none; border-radius: 12px;
     }
+    
+    /* استایل کارت‌های آماری */
     div[data-testid="stMetric"] {
         background: #f8f9fa; border-radius: 12px; padding: 15px;
         border: 1px solid #e9ecef;
+        text-align: right;
+    }
+    
+    /* راست‌چین کردن جدول‌ها */
+    table {
+        direction: rtl;
+        text-align: right !important;
+    }
+    th, td {
+        text-align: right !important;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -62,20 +86,24 @@ tab_input, tab_result, tab_guide, tab_about = st.tabs(
     ["📝 ورود اطلاعات بیمار", "🧠 نتیجه و تحلیل XAI", "📖 راهنمای فاکتورها", "ℹ️ درباره پروژه"])
 
 with tab_input:
+    st.markdown("### مشخصات بالینی بیمار (امکان تایپ مستقیم اعداد یا استفاده از کلیدهای بالا/پایین)")
     col1, col2, col3 = st.columns(3)
+    
     with col1:
-        age = st.slider("سن", int(df['age'].min()), int(df['age'].max()), int(df['age'].mean()))
+        age = st.number_input("سن (سال)", min_value=int(df['age'].min()), max_value=int(df['age'].max()), value=int(df['age'].mean()))
         male = st.selectbox("جنسیت", (1, 0), format_func=lambda x: "مرد" if x == 1 else "زن")
-        cigsPerDay = st.slider("تعداد سیگار در روز", 0, 70, 0)
+        cigsPerDay = st.number_input("تعداد سیگار در روز", min_value=0, max_value=70, value=0)
         diabetes = st.selectbox("دیابت", (0, 1), format_func=lambda x: "بله" if x == 1 else "خیر")
+        
     with col2:
-        totChol = st.slider("کلسترول کل (mg/dL)", 100, 600, int(df['totChol'].mean()))
-        sysBP = st.slider("فشار خون سیستولیک", float(df['sysBP'].min()), float(df['sysBP'].max()), float(df['sysBP'].mean()))
-        diaBP = st.slider("فشار خون دیاستولیک", float(df['diaBP'].min()), float(df['diaBP'].max()), float(df['diaBP'].mean()))
-        glucose = st.slider("قند خون", 40, 400, int(df['glucose'].mean()))
+        totChol = st.number_input("کلسترول کل (mg/dL)", min_value=100, max_value=600, value=int(df['totChol'].mean()))
+        sysBP = st.number_input("فشار خون سیستولیک", min_value=80.0, max_value=300.0, value=float(df['sysBP'].mean()))
+        diaBP = st.number_input("فشار خون دیاستولیک", min_value=40.0, max_value=200.0, value=float(df['diaBP'].mean()))
+        glucose = st.number_input("قند خون", min_value=40, max_value=400, value=int(df['glucose'].mean()))
+        
     with col3:
-        BMI = st.slider("شاخص توده بدنی (BMI)", float(df['BMI'].min()), float(df['BMI'].max()), float(df['BMI'].mean()))
-        heartRate = st.slider("ضربان قلب", 40, 200, int(df['heartRate'].mean()))
+        BMI = st.number_input("شاخص توده بدنی (BMI)", min_value=15.0, max_value=60.0, value=float(df['BMI'].mean()))
+        heartRate = st.number_input("ضربان قلب", min_value=40, max_value=200, value=int(df['heartRate'].mean()))
         BPMeds = st.selectbox("مصرف داروی فشار خون", (0, 1), format_func=lambda x: "بله" if x == 1 else "خیر")
         prevalentHyp = st.selectbox("سابقه فشار خون بالا", (0, 1), format_func=lambda x: "بله" if x == 1 else "خیر")
 
@@ -88,13 +116,13 @@ with tab_input:
     })
 
     st.session_state['input'] = df_input
-    st.info("✅ اطلاعات ذخیره شد — به تب «نتیجه و تحلیل XAI» برو و دکمه تحلیل را بزن.")
+    st.info("✅ اطلاعات ثبت شد — لطفاً برای مشاهده نتیجه به تب «نتیجه و تحلیل XAI» مراجعه کنید.")
 
 with tab_result:
     if 'input' not in st.session_state:
         st.warning("ابتدا در تب «ورود اطلاعات بیمار» مقادیر را وارد کنید.")
     else:
-        if st.button("🔍 تحلیل و پیش‌بینی"):
+        if st.button("🔍 تحلیل و پیش‌بینی هوش مصنوعی"):
             df_input = st.session_state['input']
             prob = model.predict_proba(df_input)[0]
             risk = prob[1] * 100
