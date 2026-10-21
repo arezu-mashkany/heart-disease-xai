@@ -18,34 +18,25 @@ st.markdown("""
         text-align: right;
     }
     
-    /* راست‌چین کردن عنوان‌ها و متن‌ها */
     h1, h2, h3, h4, h5, h6, p, label, span, div {
         direction: rtl;
         text-align: right;
     }
     
-    /* استایل دکمه تحلیل */
     div.stButton > button {
         width: 100%; height: 3em; font-size: 1.1em; font-weight: bold;
         background: linear-gradient(90deg, #e63946, #d62828);
         color: white; border: none; border-radius: 12px;
     }
     
-    /* استایل کارت‌های آماری */
     div[data-testid="stMetric"] {
         background: #f8f9fa; border-radius: 12px; padding: 15px;
         border: 1px solid #e9ecef;
         text-align: right;
     }
     
-    /* راست‌چین کردن جدول‌ها */
-    table {
-        direction: rtl;
-        text-align: right !important;
-    }
-    th, td {
-        text-align: right !important;
-    }
+    table { direction: rtl; text-align: right !important; }
+    th, td { text-align: right !important; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -139,19 +130,27 @@ with tab_result:
             st.progress(min(risk / 100, 1.0))
 
             st.markdown("---")
-            st.markdown("### 🧠 عوامل مؤثر بر این پیش‌بینی (SHAP)")
-            st.markdown("نمودار زیر نشان می‌دهد هر فاکتور چقدر پیش‌بینی مدل را به سمت «ریسک بالا» یا «ریسک پایین» سوق داده است:")
+            st.markdown("### 🧠 تحلیل تفکیکی و آبشاری (SHAP Waterfall)")
+            st.markdown("این نمودار دقیقاً نشان می‌دهد هر پارامتر بالینی چقدر روی تغییر پیش‌بینی از میانگین پایه به سمت وضعیت این بیمار تأثیر گذاشته است:")
+            
             try:
                 explainer = shap.TreeExplainer(model)
-                shap_values = explainer.shap_values(df_input)
-                fig = plt.figure(figsize=(9, 4))
-                if isinstance(shap_values, list):
-                    shap.summary_plot(shap_values[1], df_input, plot_type="bar", show=False)
-                else:
-                    shap.summary_plot(shap_values, df_input, plot_type="bar", show=False)
+                shap_values = explainer(df_input)
+                
+                fig, ax = plt.subplots(figsize=(10, 5))
+                # رسم نمودار waterfall برای کلاس مثبت (اندیس 1)
+                shap.plots.waterfall(shap_values[0, :, 1], show=False)
                 st.pyplot(fig)
-            except Exception:
-                st.info("نمودار تحلیلی تولید نشد.")
+            except Exception as e:
+                # پشتیبانی در صورت بروز ناسازگاری نسلی کتابخانه shap
+                try:
+                    fig = plt.figure(figsize=(9, 4))
+                    shap_vals_raw = explainer.shap_values(df_input)
+                    vals = shap_vals_raw[1] if isinstance(shap_vals_raw, list) else shap_vals_raw
+                    shap.summary_plot(vals, df_input, plot_type="bar", show=False)
+                    st.pyplot(fig)
+                except Exception:
+                    st.info("نمودار تحلیلی تولید نشد.")
 
             # توضیح متنی ساده برای پزشک
             st.markdown("### 💡 خلاصه توضیح برای پزشک")
